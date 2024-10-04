@@ -1,0 +1,1 @@
+doppler secrets download -p app_palyground-fastapi -c dev --format=env-no-quotes --no-file >| .env
