@@ -14,6 +14,7 @@ This is a FastAPI application that provides a RESTful API for managing games and
   - [Game Management](#game-management)
 - [Running the Application](#running-the-application)
 - [Environment Variables](#environment-variables)
+- [Screenshots](#Screenshots)
 
 ## Features
 
