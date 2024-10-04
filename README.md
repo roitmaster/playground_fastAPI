@@ -132,4 +132,4 @@ Replace your_secret_key and your_database_name with your desired values.
 
 Here’s a screenshot of the game:
 
-![Game Screenshot](images/games.png)
+![Game Screenshot](images/games.PNG)
