@@ -127,3 +127,9 @@ Create a .env file in the root directory with the following variables:
   DATABEASE=your_database_name
   ```
 Replace your_secret_key and your_database_name with your desired values.
+
+## Screenshots
+
+Here’s a screenshot of the game:
+
+![Game Screenshot](images/games.png)
