@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Qu
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import List, Union, Optional
@@ -57,6 +57,18 @@ class PyObjectId(ObjectId):
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
         return ObjectId(v)
+    
+    @classmethod
+    def __get_pydantic_core_schema__(cls, _source_type, handler):
+        # Generate the schema that Pydantic will use internally for this type
+        return handler(str)
+        
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema, handler):
+        """Modify the schema to indicate that the field is a string."""
+        schema = handler(core_schema)
+        schema.update(type="string", example="60d5ec49e714332b6a2f9ef1")
+        return schema
 
 
 # User Models
@@ -94,7 +106,7 @@ class Game(BaseModel):
 
 
 class UpdateGameModel(BaseModel):
-    id: PyObjectId
+    id: PyObjectId = Field(...)
     game_id: Union[str, None] = None
     bopsPromoCalloutSearchTile: Optional[str] = None
     bopsPromoCalloutSearchTileAlternate: Optional[str] = None
@@ -113,6 +125,33 @@ class UpdateGameModel(BaseModel):
     badge: Optional[str] = None
     gradingProvider: Optional[str] = None
 
+    class Config:
+        json_encoders = {PyObjectId: str}  # Use string representation for ObjectId
+        schema_extra = {
+            "example": {
+                "id": "60d5ec49e714332b6a2f9ef1",
+                "game_id": "game_123456",
+                "bopsPromoCalloutSearchTile": "Buy one, get one free!",
+                "bopsPromoCalloutSearchTileAlternate": "Limited time offer!",
+                "price": {"currency": "USD", "amount": 59.99},
+                "bopsPromoAlternate": "Discounted Bundle",
+                "image": {
+                    "url": "https://example.com/images/game.jpg",
+                    "alt": "Example Game Image"
+                },
+                "marketPrice": 69.99,
+                "releaseDate": "2023-10-10",
+                "ratings": {"ESRB": "E", "userRating": 4.5},
+                "availability": {"inStock": True, "estimatedDelivery": "3-5 business days"},
+                "url": "https://example.com/game/game_123456",
+                "name": "Example Game",
+                "productPlatform": ["PlayStation", "Xbox", "PC"],
+                "providerGrade": "Gold",
+                "mapProPrice": 54.99,
+                "badge": "Top Seller",
+                "gradingProvider": "ProviderX"
+            }
+        }
 
 class TokenData(BaseModel):
     username: Optional[str] = None
