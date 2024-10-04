@@ -19,7 +19,7 @@ app = FastAPI()
 
 SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = os.environ["ALGORITHM"]
-ACCESS_TOKEN_EXPIRE_MINUTES = os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"]
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"])
 
 MONGO_DETAILS = os.environ["MONGO_DETAILS"]
 DATABEASE = os.environ["DATABEASE"]
@@ -53,7 +53,7 @@ class PyObjectId(ObjectId):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v):
+    def validate(cls, v, x):
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
         return ObjectId(v)
@@ -73,8 +73,8 @@ class UserInDB(User):
 
 # Game Models
 class Game(BaseModel):
-    _id: Union[PyObjectId, None] = None
-    id: Union[str, None] = None
+    id: str
+    game_id: Union[str, None] = None
     bopsPromoCalloutSearchTile: Optional[str] = None
     bopsPromoCalloutSearchTileAlternate: Optional[str] = None
     price: Optional[dict] = None
@@ -94,7 +94,8 @@ class Game(BaseModel):
 
 
 class UpdateGameModel(BaseModel):
-    id: Union[str, None] = None
+    id: PyObjectId
+    game_id: Union[str, None] = None
     bopsPromoCalloutSearchTile: Optional[str] = None
     bopsPromoCalloutSearchTileAlternate: Optional[str] = None
     price: Optional[dict] = None
@@ -207,7 +208,7 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 
 # Game Routes
 @app.post("/games/", response_model=Game, status_code=201)
-async def create_game(game: Game):
+async def create_game(game: Game, current_user: User = Depends(get_current_active_user)):
     game_dict = game.dict()
     game_dict["_id"] = PyObjectId()
     new_game = await games_collection.insert_one(game_dict)
@@ -219,42 +220,45 @@ async def create_game(game: Game):
 async def list_games(
     limit: Optional[int] = Query(None, description="Limit the number of games returned"),
     sort_by: Optional[str] = Query(None, description="Sort by 'price', 'name', or 'ratings'"),
-    sort_order: Optional[str] = Query("asc", description="Sort order: 'asc' for ascending or 'desc' for descending")
+    sort_order: Optional[str] = Query("asc", description="Sort order: 'asc' for ascending or 'desc' for descending"),
+    current_user: User = Depends(get_current_active_user)
 ):
-    # Create sort dictionary based on the sort_by parameter
     sort_dict = []
     if sort_by == "price":
         sort_dict = [("price.base", 1 if sort_order == "asc" else -1)]
     elif sort_by == "name":
         sort_dict = [("name", 1 if sort_order == "asc" else -1)]
     elif sort_by == "ratings":
-        sort_dict = [("ratings.percentage", -1 if sort_order == "asc" else 1)]  # Reverse for ratings
-
+        sort_dict = [("ratings.percentage", -1 if sort_order == "asc" else 1)]
+    
     # Use default sorting if no sort_by parameter is provided
     if not sort_dict:
-        # Optionally set a default sort, e.g., by name in ascending order
         sort_dict = [("_id", 1)]
 
     games = []
     async for game in games_collection.find().sort(sort_dict).limit(limit or 0):
+        game["game_id"] = game["id"]
+        game["id"] = str(game["_id"])  # Convert ObjectId to string if necessary
         games.append(Game(**game))
     
     return games
 
 
-
 @app.get("/games/{game_id}", response_model=Game)
-async def get_game(game_id: str):
+async def get_game(game_id: str, current_user: User = Depends(get_current_active_user)):
     if not ObjectId.is_valid(game_id):
         raise HTTPException(status_code=400, detail="Invalid game ID")
     game = await games_collection.find_one({"_id": ObjectId(game_id)})
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
+    game["game_id"] = game["id"] 
+    game["id"] = str(game["_id"])
+    
     return game
 
 
 @app.put("/games/{game_id}", response_model=Game)
-async def update_game(game_id: str, game: UpdateGameModel):
+async def update_game(game_id: str, game: UpdateGameModel, current_user: User = Depends(get_current_active_user)):
     if not ObjectId.is_valid(game_id):
         raise HTTPException(status_code=400, detail="Invalid game ID")
     update_data = {k: v for k, v in game.dict().items() if v is not None}
@@ -267,7 +271,7 @@ async def update_game(game_id: str, game: UpdateGameModel):
 
 
 @app.delete("/games/{game_id}")
-async def delete_game(game_id: str):
+async def delete_game(game_id: str, current_user: User = Depends(get_current_active_user)):
     if not ObjectId.is_valid(game_id):
         raise HTTPException(status_code=400, detail="Invalid game ID")
     result = await games_collection.delete_one({"_id": ObjectId(game_id)})
